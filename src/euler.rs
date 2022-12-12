@@ -4,8 +4,11 @@ Conversion from quaternions to Euler rotation sequences.
 From: http://bediyap.com/programming/convert-quaternion-to-euler-rotations/
 */
 
-use super::quat::{DQuat, Quat};
-use crate::core::traits::scalar::*;
+use super::{DQuat, Quat};
+
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
+use num_traits::Float;
 
 /// Euler rotation sequences.
 ///
@@ -13,9 +16,8 @@ use crate::core::traits::scalar::*;
 /// E.g. XYZ will first apply the z-axis rotation.
 ///
 /// YXZ can be used for yaw (y-axis), pitch (x-axis), roll (z-axis).
-///
-/// The two-axis rotations (e.g. ZYZ) are not fully tested and have to be treated with caution.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum EulerRot {
     /// Intrinsic three-axis rotation ZYX
     ZYX,
@@ -29,25 +31,6 @@ pub enum EulerRot {
     XYZ,
     /// Intrinsic three-axis rotation XZY
     XZY,
-
-    /// Intrinsic two-axis rotation ZYZ
-    #[deprecated(note = "Untested! Use at own risk!")]
-    ZYZ,
-    /// Intrinsic two-axis rotation ZXZ
-    #[deprecated(note = "Untested! Use at own risk!")]
-    ZXZ,
-    /// Intrinsic two-axis rotation YXY
-    #[deprecated(note = "Untested! Use at own risk!")]
-    YXY,
-    /// Intrinsic two-axis rotation YZY
-    #[deprecated(note = "Untested! Use at own risk!")]
-    YZY,
-    /// Intrinsic two-axis rotation XYX
-    #[deprecated(note = "Untested! Use at own risk!")]
-    XYX,
-    /// Intrinsic two-axis rotation XZX
-    #[deprecated(note = "Untested! Use at own risk!")]
-    XZX,
 }
 
 impl Default for EulerRot {
@@ -58,8 +41,8 @@ impl Default for EulerRot {
 }
 
 /// Conversion from quaternion to euler angles.
-pub trait EulerFromQuaternion<Q: Copy>: Sized + Copy {
-    type Output: FloatEx;
+pub(crate) trait EulerFromQuaternion<Q: Copy>: Sized + Copy {
+    type Output;
     /// Compute the angle of the first axis (X-x-x)
     fn first(self, q: Q) -> Self::Output;
     /// Compute then angle of the second axis (x-X-x)
@@ -74,7 +57,7 @@ pub trait EulerFromQuaternion<Q: Copy>: Sized + Copy {
 }
 
 /// Conversion from euler angles to quaternion.
-pub trait EulerToQuaternion<T>: Copy {
+pub(crate) trait EulerToQuaternion<T>: Copy {
     type Output;
     /// Create the rotation quaternion for the three angles of this euler rotation sequence.
     fn new_quat(self, u: T, v: T, w: T) -> Self::Output;
@@ -82,7 +65,7 @@ pub trait EulerToQuaternion<T>: Copy {
 
 /// Adds a atan2 that handles the negative zero case.
 /// Basically forces positive zero in the x-argument for atan2.
-pub trait Atan2Fixed<T = Self> {
+pub(crate) trait Atan2Fixed<T = Self> {
     fn atan2_fixed(self, other: T) -> T;
 }
 
@@ -104,36 +87,18 @@ macro_rules! impl_from_quat {
             fn first(self, q: $quat) -> $t {
                 use EulerRot::*;
                 match self {
-                    ZYX => (Self::Output::TWO * (q.x * q.y + q.w * q.z))
+                    ZYX => (2.0 * (q.x * q.y + q.w * q.z))
                         .atan2(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z),
-                    ZXY => (-Self::Output::TWO * (q.x * q.y - q.w * q.z))
+                    ZXY => (-2.0 * (q.x * q.y - q.w * q.z))
                         .atan2(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z),
-                    YXZ => (Self::Output::TWO * (q.x * q.z + q.w * q.y))
+                    YXZ => (2.0 * (q.x * q.z + q.w * q.y))
                         .atan2(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z),
-                    YZX => (-Self::Output::TWO * (q.x * q.z - q.w * q.y))
+                    YZX => (-2.0 * (q.x * q.z - q.w * q.y))
                         .atan2(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z),
-                    XYZ => (-Self::Output::TWO * (q.y * q.z - q.w * q.x))
+                    XYZ => (-2.0 * (q.y * q.z - q.w * q.x))
                         .atan2(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z),
-                    XZY => (Self::Output::TWO * (q.y * q.z + q.w * q.x))
+                    XZY => (2.0 * (q.y * q.z + q.w * q.x))
                         .atan2(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z),
-                    #[allow(deprecated)]
-                    ZYZ => (Self::Output::TWO * (q.y * q.z + q.w * q.x))
-                        .atan2_fixed(-Self::Output::TWO * (q.x * q.z - q.w * q.y)),
-                    #[allow(deprecated)]
-                    ZXZ => (Self::Output::TWO * (q.x * q.z - q.w * q.y))
-                        .atan2_fixed(Self::Output::TWO * (q.y * q.z + q.w * q.x)),
-                    #[allow(deprecated)]
-                    YXY => (Self::Output::TWO * (q.x * q.y + q.w * q.z))
-                        .atan2_fixed(-Self::Output::TWO * (q.y * q.z - q.w * q.x)),
-                    #[allow(deprecated)]
-                    YZY => (Self::Output::TWO * (q.y * q.z - q.w * q.x))
-                        .atan2_fixed(Self::Output::TWO * (q.x * q.y + q.w * q.z)),
-                    #[allow(deprecated)]
-                    XYX => (Self::Output::TWO * (q.x * q.y - q.w * q.z))
-                        .atan2_fixed(Self::Output::TWO * (q.x * q.z + q.w * q.y)),
-                    #[allow(deprecated)]
-                    XZX => (Self::Output::TWO * (q.x * q.z + q.w * q.y))
-                        .atan2_fixed(-Self::Output::TWO * (q.x * q.y - q.w * q.z)),
                 }
             }
 
@@ -142,66 +107,35 @@ macro_rules! impl_from_quat {
 
                 /// Clamp number to range [-1,1](-1,1) for asin() and acos(), else NaN is possible.
                 #[inline(always)]
-                fn arc_clamp<T: FloatEx>(val: T) -> T {
-                    NumEx::min(NumEx::max(val, T::NEG_ONE), T::ONE)
+                fn arc_clamp(val: $t) -> $t {
+                    <$t>::min(<$t>::max(val, -1.0), 1.0)
                 }
 
                 match self {
-                    ZYX => arc_clamp(-Self::Output::TWO * (q.x * q.z - q.w * q.y)).asin(),
-                    ZXY => arc_clamp(Self::Output::TWO * (q.y * q.z + q.w * q.x)).asin(),
-                    YXZ => arc_clamp(-Self::Output::TWO * (q.y * q.z - q.w * q.x)).asin(),
-                    YZX => arc_clamp(Self::Output::TWO * (q.x * q.y + q.w * q.z)).asin(),
-                    XYZ => arc_clamp(Self::Output::TWO * (q.x * q.z + q.w * q.y)).asin(),
-                    XZY => arc_clamp(-Self::Output::TWO * (q.x * q.y - q.w * q.z)).asin(),
-                    #[allow(deprecated)]
-                    ZYZ => arc_clamp(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z).acos(),
-                    #[allow(deprecated)]
-                    ZXZ => arc_clamp(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z).acos(),
-                    #[allow(deprecated)]
-                    YXY => arc_clamp(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z).acos(),
-                    #[allow(deprecated)]
-                    YZY => arc_clamp(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z).acos(),
-                    #[allow(deprecated)]
-                    XYX => arc_clamp(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z).acos(),
-                    #[allow(deprecated)]
-                    XZX => arc_clamp(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z).acos(),
+                    ZYX => arc_clamp(-2.0 * (q.x * q.z - q.w * q.y)).asin(),
+                    ZXY => arc_clamp(2.0 * (q.y * q.z + q.w * q.x)).asin(),
+                    YXZ => arc_clamp(-2.0 * (q.y * q.z - q.w * q.x)).asin(),
+                    YZX => arc_clamp(2.0 * (q.x * q.y + q.w * q.z)).asin(),
+                    XYZ => arc_clamp(2.0 * (q.x * q.z + q.w * q.y)).asin(),
+                    XZY => arc_clamp(-2.0 * (q.x * q.y - q.w * q.z)).asin(),
                 }
             }
 
             fn third(self, q: $quat) -> $t {
                 use EulerRot::*;
-                #[allow(deprecated)]
                 match self {
-                    ZYX => (Self::Output::TWO * (q.y * q.z + q.w * q.x))
+                    ZYX => (2.0 * (q.y * q.z + q.w * q.x))
                         .atan2(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z),
-                    ZXY => (-Self::Output::TWO * (q.x * q.z - q.w * q.y))
+                    ZXY => (-2.0 * (q.x * q.z - q.w * q.y))
                         .atan2(q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z),
-                    YXZ => (Self::Output::TWO * (q.x * q.y + q.w * q.z))
+                    YXZ => (2.0 * (q.x * q.y + q.w * q.z))
                         .atan2(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z),
-                    YZX => (-Self::Output::TWO * (q.y * q.z - q.w * q.x))
+                    YZX => (-2.0 * (q.y * q.z - q.w * q.x))
                         .atan2(q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z),
-                    XYZ => (-Self::Output::TWO * (q.x * q.y - q.w * q.z))
+                    XYZ => (-2.0 * (q.x * q.y - q.w * q.z))
                         .atan2(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z),
-                    XZY => (Self::Output::TWO * (q.x * q.z + q.w * q.y))
+                    XZY => (2.0 * (q.x * q.z + q.w * q.y))
                         .atan2(q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z),
-                    #[allow(deprecated)]
-                    ZYZ => (Self::Output::TWO * (q.y * q.z - q.w * q.x))
-                        .atan2_fixed(Self::Output::TWO * (q.x * q.z + q.w * q.y)),
-                    #[allow(deprecated)]
-                    ZXZ => (Self::Output::TWO * (q.x * q.z + q.w * q.y))
-                        .atan2_fixed(-Self::Output::TWO * (q.y * q.z - q.w * q.x)),
-                    #[allow(deprecated)]
-                    YXY => (Self::Output::TWO * (q.x * q.y - q.w * q.z))
-                        .atan2_fixed(Self::Output::TWO * (q.y * q.z + q.w * q.x)),
-                    #[allow(deprecated)]
-                    YZY => (Self::Output::TWO * (q.y * q.z + q.w * q.x))
-                        .atan2_fixed(-Self::Output::TWO * (q.x * q.y - q.w * q.z)),
-                    #[allow(deprecated)]
-                    XYX => (Self::Output::TWO * (q.x * q.y + q.w * q.z))
-                        .atan2_fixed(-Self::Output::TWO * (q.x * q.z - q.w * q.y)),
-                    #[allow(deprecated)]
-                    XZX => (Self::Output::TWO * (q.x * q.z - q.w * q.y))
-                        .atan2_fixed(Self::Output::TWO * (q.x * q.y + q.w * q.z)),
                 }
             }
         }
@@ -235,18 +169,6 @@ macro_rules! impl_to_quat {
                     YZX => rot_y(u) * rot_z(v) * rot_x(w),
                     XYZ => rot_x(u) * rot_y(v) * rot_z(w),
                     XZY => rot_x(u) * rot_z(v) * rot_y(w),
-                    #[allow(deprecated)]
-                    ZYZ => rot_z(u) * rot_y(v) * rot_z(w),
-                    #[allow(deprecated)]
-                    ZXZ => rot_z(u) * rot_x(v) * rot_z(w),
-                    #[allow(deprecated)]
-                    YXY => rot_y(u) * rot_x(v) * rot_y(w),
-                    #[allow(deprecated)]
-                    YZY => rot_y(u) * rot_z(v) * rot_y(w),
-                    #[allow(deprecated)]
-                    XYX => rot_x(u) * rot_y(v) * rot_x(w),
-                    #[allow(deprecated)]
-                    XZX => rot_x(u) * rot_z(v) * rot_x(w),
                 }
                 .normalize()
             }
