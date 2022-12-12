@@ -1,15 +1,19 @@
+#![allow(clippy::excessive_precision)]
+
 #[macro_use]
 mod support;
 
 macro_rules! impl_quat_tests {
-    ($t:ident, $const_new:ident, $new:ident, $mat3:ident, $mat4:ident, $quat:ident, $vec2:ident, $vec3:ident, $vec4:ident) => {
+    ($t:ident, $new:ident, $mat3:ident, $mat4:ident, $quat:ident, $vec2:ident, $vec3:ident, $vec4:ident) => {
         use core::$t::INFINITY;
         use core::$t::NAN;
         use core::$t::NEG_INFINITY;
 
         glam_test!(test_const, {
-            const Q: $quat = $const_new!([1.0, 2.0, 3.0, 4.0]);
-            assert_eq!($quat::from_xyzw(1.0, 2.0, 3.0, 4.0), Q);
+            const Q0: $quat = $quat::from_xyzw(1.0, 2.0, 3.0, 4.0);
+            const Q1: $quat = $quat::from_array([1.0, 2.0, 3.0, 4.0]);
+            assert_eq!([1.0, 2.0, 3.0, 4.0], *Q0.as_ref());
+            assert_eq!([1.0, 2.0, 3.0, 4.0], *Q1.as_ref());
         });
 
         glam_test!(test_nan, {
@@ -32,6 +36,8 @@ macro_rules! impl_quat_tests {
             assert_eq!([v1.x, v1.y, v1.z, v1.w], a1);
 
             assert_eq!(q1, $quat::from_array(a1));
+
+            assert_eq!(a1, *q0.as_ref());
         });
 
         glam_test!(test_funcs, {
@@ -79,7 +85,7 @@ macro_rules! impl_quat_tests {
             assert!(x0.is_normalized());
             let (axis, angle) = x0.to_axis_angle();
             assert_approx_eq!(axis, $vec3::X);
-            assert_approx_eq!(angle, pitch);
+            assert_approx_eq!(angle, pitch, 1e-6);
             let x1 = $quat::from_euler(EulerRot::YXZ, zero, pitch, zero);
             assert_approx_eq!(x0, x1);
             let x2 = $quat::from_axis_angle($vec3::X, pitch);
@@ -127,6 +133,10 @@ macro_rules! impl_quat_tests {
             let (axis, angle) = $quat::IDENTITY.to_axis_angle();
             assert_eq!(axis, $vec3::X);
             assert_eq!(angle, rad(0.0));
+
+            let mut x0 = $quat::from_rotation_x(pitch);
+            x0 *= x0;
+            assert_approx_eq!(x0, $quat::from_rotation_x(pitch * 2.0));
 
             should_glam_assert!({ ($quat::IDENTITY * 2.0).inverse() });
             should_glam_assert!({ $quat::from_axis_angle($vec3::ZERO, 0.0) });
@@ -280,13 +290,43 @@ macro_rules! impl_quat_tests {
             while s <= 1.0 {
                 let q0 = $quat::from_rotation_y(deg(0.0));
                 let q1 = $quat::from_rotation_y(deg(90.0));
-                assert_approx_eq!(
-                    $quat::from_rotation_y(deg(s * 90.0)),
-                    q0.slerp(q1, s),
-                    1.0e-3
-                );
+                let result = q0.slerp(q1, s);
+                assert_approx_eq!($quat::from_rotation_y(deg(s * 90.0)), result, 1.0e-3);
+                assert!(result.is_normalized());
                 s += step;
             }
+        });
+
+        glam_test!(test_slerp_tau, {
+            let q1 = $quat::IDENTITY;
+            let q2 = $quat::from_rotation_x(core::$t::consts::TAU);
+            let s = q1.slerp(q2, 1.);
+            assert!(s.is_finite());
+            assert!(s.is_normalized());
+        });
+
+        glam_test!(test_slerp_negative_tau, {
+            let q1 = $quat::IDENTITY;
+            let q2 = $quat::from_rotation_x(-core::$t::consts::TAU);
+            let s = q1.slerp(q2, 1.);
+            assert!(s.is_finite());
+            assert!(s.is_normalized());
+        });
+
+        glam_test!(test_slerp_pi, {
+            let q1 = $quat::IDENTITY;
+            let q2 = $quat::from_rotation_x(core::$t::consts::PI);
+            let s = q1.slerp(q2, 1.);
+            assert!(s.is_finite());
+            assert!(s.is_normalized());
+        });
+
+        glam_test!(test_slerp_negative_pi, {
+            let q1 = $quat::IDENTITY;
+            let q2 = $quat::from_rotation_x(-core::$t::consts::PI);
+            let s = q1.slerp(q2, 1.);
+            assert!(s.is_finite());
+            assert!(s.is_normalized());
         });
 
         glam_test!(test_fmt, {
@@ -368,11 +408,13 @@ macro_rules! impl_quat_tests {
         glam_test!(test_sum, {
             let two = $new(2.0, 2.0, 2.0, 2.0);
             assert_eq!(vec![two, two].iter().sum::<$quat>(), two + two);
+            assert_eq!(vec![two, two].into_iter().sum::<$quat>(), two + two);
         });
 
         glam_test!(test_product, {
             let two = $new(2.0, 2.0, 2.0, 2.0).normalize();
             assert_eq!(vec![two, two].iter().product::<$quat>(), two * two);
+            assert_eq!(vec![two, two].into_iter().product::<$quat>(), two * two);
         });
 
         glam_test!(test_is_finite, {
@@ -471,7 +513,7 @@ macro_rules! impl_quat_tests {
 mod quat {
     use crate::support::{deg, rad};
     use core::ops::Neg;
-    use glam::{const_quat, quat, EulerRot, Mat3, Mat4, Quat, Vec2, Vec3, Vec3A, Vec4};
+    use glam::{quat, EulerRot, Mat3, Mat4, Quat, Vec2, Vec3, Vec3A, Vec4};
 
     glam_test!(test_align, {
         use std::mem;
@@ -544,6 +586,16 @@ mod quat {
         assert_approx_eq!(-Vec3A::X, mrzx.mul_vec3a(Vec3A::Y));
     });
 
+    glam_test!(test_from_mat3a, {
+        use glam::Mat3A;
+        let yaw = deg(30.0);
+        let y0 = Quat::from_rotation_y(yaw);
+        let y1 = Quat::from_mat3a(&Mat3A::from_rotation_y(yaw));
+        assert_approx_eq!(y0, y1);
+        let y2 = Quat::from_mat3a(&Mat3A::from_quat(y0));
+        assert_approx_eq!(y0, y2);
+    });
+
     glam_test!(test_as, {
         use glam::DQuat;
         assert_approx_eq!(
@@ -556,13 +608,13 @@ mod quat {
         );
     });
 
-    impl_quat_tests!(f32, const_quat, quat, Mat3, Mat4, Quat, Vec2, Vec3, Vec4);
+    impl_quat_tests!(f32, quat, Mat3, Mat4, Quat, Vec2, Vec3, Vec4);
 }
 
 mod dquat {
     use crate::support::{deg, rad};
     use core::ops::Neg;
-    use glam::{const_dquat, dquat, DMat3, DMat4, DQuat, DVec2, DVec3, DVec4, EulerRot};
+    use glam::{dquat, DMat3, DMat4, DQuat, DVec2, DVec3, DVec4, EulerRot};
 
     glam_test!(test_align, {
         use std::mem;
@@ -570,15 +622,5 @@ mod dquat {
         assert_eq!(mem::align_of::<f64>(), mem::align_of::<DQuat>());
     });
 
-    impl_quat_tests!(
-        f64,
-        const_dquat,
-        dquat,
-        DMat3,
-        DMat4,
-        DQuat,
-        DVec2,
-        DVec3,
-        DVec4
-    );
+    impl_quat_tests!(f64, dquat, DMat3, DMat4, DQuat, DVec2, DVec3, DVec4);
 }
