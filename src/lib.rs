@@ -219,6 +219,11 @@ and benchmarks.
 * `num-traits` - required to compile `no_std`, will be included when enabling
   the `libm` feature
 * `rand` - implementations of `Distribution` trait for all `glam` types.
+* `rkyv` - implementations of `Archive`, `Serialize` and `Deserialize` for all
+  `glam` types. Note that serialization is not interoperable with and without the
+  `scalar-math` feature. It should work between all other builds of `glam`.
+  Endian conversion is currently not supported
+* `bytecheck` - to perform archive validation when using the `rkyv` feature
 * `serde` - implementations of `Serialize` and `Deserialize` for all `glam`
   types. Note that serialization should work between builds of `glam` with and without SIMD enabled
 * `scalar-math` - disables SIMD support and uses native alignment for all types.
@@ -226,118 +231,93 @@ and benchmarks.
   passed to `glam` to help catch runtime errors.
 * `glam-assert` - adds assertions to all builds which check the validity of parameters passed to
   `glam` to help catch runtime errors.
+* `cuda` - forces `glam` types to match expected cuda alignment
+* `fast-math` - By default, glam attempts to provide bit-for-bit identical
+  results on all platforms. Using this feature will enable platform specific
+  optimizations that may not be identical to other platforms. **Intermediate
+  libraries should not use this feature and defer the decision to the final
+  binary build**.
+* `core-simd` - enables SIMD support via the portable simd module. This is an
+  unstable feature which requires a nightly Rust toolchain and `std` support.
 
 ## Minimum Supported Rust Version (MSRV)
 
-The minimum supported Rust version is `1.52.1`.
+The minimum supported Rust version is `1.58.1`.
 
 */
-#![doc(html_root_url = "https://docs.rs/glam/0.20.3")]
+#![doc(html_root_url = "https://docs.rs/glam/0.22.0")]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(target_arch = "spirv", feature(asm, register_attr, repr_simd))]
+#![cfg_attr(target_arch = "spirv", feature(repr_simd))]
 #![deny(
     rust_2018_compatibility,
     rust_2018_idioms,
     future_incompatible,
     nonstandard_style
 )]
-// This would require renaming a lot of stuff, disabling for now.
-#![allow(clippy::upper_case_acronyms)]
 // clippy doesn't like `to_array(&self)`
 #![allow(clippy::wrong_self_convention)]
+#![cfg_attr(
+    all(feature = "core-simd", not(feature = "scalar-math")),
+    feature(portable_simd)
+)]
 
 #[macro_use]
 mod macros;
 
-#[macro_use]
-mod mat;
-
-#[macro_use]
-mod vec;
-
-#[doc(hidden)]
-pub mod cast;
-
-mod affine2;
-mod affine3;
-mod core;
+mod align16;
+mod deref;
 mod euler;
 mod features;
-mod mat2;
-mod mat3;
-mod mat4;
-mod quat;
-mod vec2;
-mod vec3;
-mod vec4;
-mod vec_mask;
+mod float_ex;
 
 #[cfg(target_arch = "spirv")]
 mod spirv;
 
-#[cfg(feature = "transform-types")]
-mod transform;
+#[cfg(all(
+    target_feature = "sse2",
+    not(any(feature = "core-simd", feature = "scalar-math"))
+))]
+mod sse2;
 
-#[doc(hidden)]
-pub use self::core::storage::{XY, XYZ, XYZW};
+#[cfg(all(
+    target_feature = "simd128",
+    not(any(feature = "core-simd", feature = "scalar-math"))
+))]
+mod wasm32;
+
+#[cfg(all(feature = "core-simd", not(feature = "scalar-math")))]
+mod coresimd;
+
+#[cfg(all(
+    target_feature = "sse2",
+    not(any(feature = "core-simd", feature = "scalar-math"))
+))]
+use align16::Align16;
+
+use float_ex::FloatEx;
 
 /** `bool` vector mask types. */
-pub mod bool {
-    pub use super::vec_mask::{BVec2, BVec3, BVec3A, BVec4, BVec4A};
-}
+pub mod bool;
 pub use self::bool::*;
 
 /** `f32` vector, quaternion and matrix types. */
-pub mod f32 {
-    pub use super::affine2::Affine2;
-    pub use super::affine3::Affine3A;
-    pub use super::mat2::{mat2, Mat2};
-    pub use super::mat3::{mat3, mat3a, Mat3, Mat3A};
-    pub use super::mat4::{mat4, Mat4};
-    pub use super::quat::{quat, Quat};
-    pub use super::vec2::{vec2, Vec2};
-    pub use super::vec3::{vec3, vec3a, Vec3, Vec3A};
-    pub use super::vec4::{vec4, Vec4};
-
-    #[cfg(feature = "transform-types")]
-    #[allow(deprecated)]
-    pub use super::transform::{TransformRT, TransformSRT};
-}
+pub mod f32;
 pub use self::f32::*;
 
 /** `f64` vector, quaternion and matrix types. */
-pub mod f64 {
-    pub use super::affine2::DAffine2;
-    pub use super::affine3::DAffine3;
-    pub use super::mat2::{dmat2, DMat2};
-    pub use super::mat3::{dmat3, DMat3};
-    pub use super::mat4::{dmat4, DMat4};
-    pub use super::quat::{dquat, DQuat};
-    pub use super::vec2::{dvec2, DVec2};
-    pub use super::vec3::{dvec3, DVec3};
-    pub use super::vec4::{dvec4, DVec4};
-}
+pub mod f64;
 pub use self::f64::*;
 
 /** `i32` vector types. */
-pub mod i32 {
-    pub use super::vec2::{ivec2, IVec2};
-    pub use super::vec3::{ivec3, IVec3};
-    pub use super::vec4::{ivec4, IVec4};
-}
+pub mod i32;
 pub use self::i32::*;
 
 /** `u32` vector types. */
-pub mod u32 {
-    pub use super::vec2::{uvec2, UVec2};
-    pub use super::vec3::{uvec3, UVec3};
-    pub use super::vec4::{uvec4, UVec4};
-}
+pub mod u32;
 pub use self::u32::*;
 
 /** Traits adding swizzle methods to all vector types. */
 pub mod swizzles;
-
 pub use self::swizzles::{Vec2Swizzles, Vec3Swizzles, Vec4Swizzles};
 
 /** Rotation Helper */
