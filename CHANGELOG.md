@@ -5,6 +5,153 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog], and this project adheres to
 [Semantic Versioning].
 
+## [0.22.0] - 2022-10-24
+
+### Breaking changes
+
+* Added `u32` implementation of `BVec3A` and `BVec4` when SIMD is not available.
+  These are used instead of aliasing to the `bool` implementations.
+
+* Removed `Add`, `Sub`, and scalar `Mul` implementations from affine types as
+  they didn't make sense on these types.
+
+* Removed deprecated `const_*` macros. These have been replaced by `const fn`
+  methods.
+
+### Fixed
+
+* Fixed `neg` and `signum` to consistently handle negative zero across multiple
+  platforms.
+
+* Removed `register_attr` feature usage for SPIR-V targets.
+
+### Added
+
+* Added missing `Serialize`, `Deserialize` and `PartialEq` implementations.
+
+* Added `Sum<Self>` and `Product<Self>` implementations for all vector, matrix
+  and quaternion types.
+
+* Added 4x4 matrix methods `look_at_lh` and `look_at_rh`. These were previously
+  private.
+
+* Added `dot_into_vec` methods to vector which returns the result of the dot
+  product splatted to all vector lanes.
+
+* Added `is_negative_bitmask` to vector types which returns a `u32` of bits for
+  each negative vector lane.
+
+* Added `splat` method and `TRUE` and `FALSE` constants to all `BVec` types.
+
+* Added `from_mat3a` methods to `Affine2`, `Mat2`, `Mat4` and `Quat` types.
+
+### Changed
+
+* Disable `serde` default features.
+
+* Made `to_cols_array`, `to_cols_array_2d`, and `from_diagonal` methods
+ `const fn`.
+
+## [0.21.3] - 2022-08-02
+
+### Fixed
+
+* Fixed `glam_assert` being too restrictive in matrix transform point and
+  transform vector methods.
+
+### Added
+
+* Added experimental `core-simd` feature which enables SIMD support via the
+  unstable `core::simd` module.
+
+### Changed
+
+* Derive from `PartialEq` and `Eq` instead of providing a trait implementation
+  for all non SIMD types.
+
+## [0.21.2] - 2022-06-25
+
+### Fixed
+
+* Restore missing `$crate::` prefix in deprecated `const_*` macros.
+
+* Fixed some performance regressions in affine and matrix determinant and
+  inverses due to lack of inlining.
+
+* Fixed some performance regressions in the SSE2 `Vec3A` to `Vec3` from
+  conversion.
+
+### Added
+
+* Implemented `BitXor` and `BitXorAssign` traits for `bool` vectors.
+
+## [0.21.1] - 2022-06-22
+
+### Fixed
+
+* Fix compilation when FMA support is enabled.
+
+## [0.21.0] - 2022-06-22
+
+### Breaking changes
+
+* Minimum Supported Version of Rust bumped to 1.58.1 to allow `const` pointer
+  dereferences in constant evaluation.
+
+* The `abs_diff_eq` method on `Mat2` and `DMat2` now takes `other` by value
+  instead of reference. This is consistent with the other matrix types.
+
+* The `AsMut` and `Deref` trait implementations on `Quat` and `DQuat` was
+  removed. Quaternion fields are now public.
+
+* The `AsRef` trait implementations were removed from `BVec2`, `BVec3`,
+  `BVec3A`, `BVec4` and `BVec4A`.
+
+### Added
+
+* `NEG_ONE` constant was added to all signed vector types.
+
+* `NEG_X`, `NEG_Y`, `NEG_Z` and `NEG_W` negative axis vectors were added to
+  signed vector types.
+
+* The `rotate` and `from_angle` methods were added to `Vec2` and `DVec2`.
+  `from_angle` returns a 2D vector containing `[angle.cos(), angle.sin()]` that
+  can be used to `rotate` another 2D vector.
+
+* The `from_array` `const` function was added to all vector types.
+
+### Changed
+
+* Source code is now largely generated. This removes most usage of macros
+  internally to improve readability. There should be no change in API or
+  behavior other than what is documented here.
+
+* Many methods have been made `const fn`:
+  * `new`, `splat`, `from_slice`, `to_array` and `extend` on vector types
+  * `from_cols`, `from_cols_array`, `from_cols_array_2d`, `from_cols_slice` on
+    matrix types
+  * `from_xyzw` and `from_array` on quaternion types
+  * `from_cols` on affine types
+
+* The `const` new macros where deprecated.
+
+### Removed
+
+* Deleted deprecated `TransformRT` and `TransformSRT` types.
+
+## [0.20.5] - 2022-04-12
+
+### Fixed
+
+* Fixed a bug in the scalar implementation of 4D vector `max_element` method
+  where the `w` element check was incorrect.
+
+## [0.20.4] - 2022-04-11
+
+### Fixed
+
+* Fixed a bug with quaternion `slerp` with a rotation of tau.
+
 ## [0.20.3] - 2022-03-28
 
 ### Added
@@ -28,7 +175,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [0.20.1] - 2021-11-23
 
-### Addeed
+### Added
 
 * Added the `from_rotation_arc_2d()` method to `Quat` and `DQuat` which will
   return a rotation between two 2D vectors around the z axis.
@@ -742,7 +889,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 [Keep a Changelog]: https://keepachangelog.com/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[Unreleased]: https://github.com/bitshifter/glam-rs/compare/0.20.3...HEAD
+[Unreleased]: https://github.com/bitshifter/glam-rs/compare/0.22.0...HEAD
+[0.22.0]: https://github.com/bitshifter/glam-rs/compare/0.21.3...0.22.0
+[0.21.3]: https://github.com/bitshifter/glam-rs/compare/0.21.2...0.21.3
+[0.21.2]: https://github.com/bitshifter/glam-rs/compare/0.21.1...0.21.2
+[0.21.1]: https://github.com/bitshifter/glam-rs/compare/0.21.0...0.21.1
+[0.21.0]: https://github.com/bitshifter/glam-rs/compare/0.20.5...0.21.0
+[0.20.5]: https://github.com/bitshifter/glam-rs/compare/0.20.4...0.20.5
+[0.20.4]: https://github.com/bitshifter/glam-rs/compare/0.20.3...0.20.4
 [0.20.3]: https://github.com/bitshifter/glam-rs/compare/0.20.2...0.20.3
 [0.20.2]: https://github.com/bitshifter/glam-rs/compare/0.20.1...0.20.2
 [0.20.1]: https://github.com/bitshifter/glam-rs/compare/0.20.0...0.20.1

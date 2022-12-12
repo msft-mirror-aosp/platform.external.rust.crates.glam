@@ -2,7 +2,7 @@
 
 [![Build Status]][github-ci] [![Coverage Status]][coveralls.io]
 [![Latest Version]][crates.io] [![docs]][docs.rs]
-[![Minimum Supported Rust Version]][Rust 1.52]
+[![Minimum Supported Rust Version]][Rust 1.58.1]
 
 A simple and fast 3D math library for games and graphics.
 
@@ -54,9 +54,13 @@ SIMD is supported on `x86`, `x86_64` and `wasm32` targets.
   `RUSTCFLAGS`.
 * To enable `simd128` on `wasm32` targets add `-C target-feature=+simd128` to
   `RUSTFLAGS`.
+* Experimental [portable simd] support can be enabled with the `core-simd`
+  feature. This requires the nightly compiler as it is still unstable in Rust.
 
 Note that SIMD on `wasm32` passes tests but has not been benchmarked,
 performance may or may not be better than scalar math.
+
+[portable simd]: https://doc.rust-lang.org/core/simd/index.html
 
 ### `no_std` support
 
@@ -66,7 +70,7 @@ defined in `std`. For example:
 
 ```toml
 [dependencies]
-glam = { version = "0.20.3", default-features = false, features = ["libm"] }
+glam = { version = "0.22", default-features = false, features = ["libm"] }
 ```
 
 To support both `std` and `no_std` builds in project, you can use the following
@@ -80,7 +84,7 @@ std = ["glam/std"]
 libm = ["glam/libm"]
 
 [dependencies]
-glam = { version = "0.20.3", default-features = false }
+glam = { version = "0.22", default-features = false }
 ```
 
 ### Optional features
@@ -100,11 +104,6 @@ glam = { version = "0.20.3", default-features = false }
   `scalar-math` feature. It should work between all other builds of `glam`.
   Endian conversion is currently not supported
 * [`bytecheck`] - to perform archive validation when using the `rkyv` feature
-* [`fast-math`] - By default, glam attempts to provide bit-for-bit identical 
-  results on all platforms. Using this feature will enable platform specific 
-  optimizations that may not be identical to other platforms. **Intermediate 
-  libraries should not use this feature and defer the decision to the final 
-  binary build**.
 
 [`approx`]: https://docs.rs/approx
 [`bytemuck`]: https://docs.rs/bytemuck
@@ -123,14 +122,19 @@ glam = { version = "0.20.3", default-features = false }
   of parameters passed to `glam` to help catch runtime errors
 * `glam-assert` - adds validation assertions to all builds
 * `cuda` - forces `glam` types to match expected [cuda alignment]
+* `fast-math` - By default, glam attempts to provide bit-for-bit identical
+  results on all platforms. Using this feature will enable platform specific
+  optimizations that may not be identical to other platforms. **Intermediate
+  libraries should not use this feature and defer the decision to the final
+  binary build**.
+* `core-simd` - enables SIMD support via the [portable simd] module. This is an
+  unstable feature which requires a nightly Rust toolchain and `std` support.
 
 [cuda alignment]: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#built-in-vector-types
 
 ### Minimum Supported Rust Version (MSRV)
 
-The minimum supported version of Rust for `glam` is `1.52.1`.
-
-`wasm32` SIMD intrinsics require Rust `1.54.0`.
+The minimum supported version of Rust for `glam` is `1.58.1`.
 
 ## Conventions
 
@@ -249,5 +253,5 @@ See [ATTRIBUTION.md] for details.
 [crates.io]: https://crates.io/crates/glam/
 [docs]: https://docs.rs/glam/badge.svg
 [docs.rs]: https://docs.rs/glam/
-[Minimum Supported Rust Version]: https://img.shields.io/badge/Rust-1.52.1-blue?color=fc8d62&logo=rust
-[Rust 1.52]: https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1521-2021-05-10
+[Minimum Supported Rust Version]: https://img.shields.io/badge/Rust-1.58.1-blue?color=fc8d62&logo=rust
+[Rust 1.58.1]: https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1581-2022-01-19
