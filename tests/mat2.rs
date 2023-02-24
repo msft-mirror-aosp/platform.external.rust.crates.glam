@@ -2,18 +2,21 @@
 mod support;
 
 macro_rules! impl_mat2_tests {
-    ($t:ident, $const_new:ident, $newmat2:ident, $mat2:ident, $mat3:ident, $newvec2:ident, $vec2:ident) => {
+    ($t:ident, $newmat2:ident, $mat2:ident, $mat3:ident, $newvec2:ident, $vec2:ident) => {
         const IDENTITY: [[$t; 2]; 2] = [[1.0, 0.0], [0.0, 1.0]];
 
         const MATRIX: [[$t; 2]; 2] = [[1.0, 2.0], [3.0, 4.0]];
 
+        const MATRIX1D: [$t; 4] = [1.0, 2.0, 3.0, 4.0];
+
         glam_test!(test_const, {
-            const M0: $mat2 = $const_new!([0.0; 4]);
-            const M1: $mat2 = $const_new!([1.0, 2.0, 3.0, 4.0]);
-            const M2: $mat2 = $const_new!([1.0, 2.0], [3.0, 4.0]);
-            assert_eq!($mat2::ZERO, M0);
-            assert_eq!($mat2::from_cols_array(&[1.0, 2.0, 3.0, 4.0]), M1);
-            assert_eq!($mat2::from_cols_array(&[1.0, 2.0, 3.0, 4.0]), M2);
+            const M0: $mat2 = $mat2::from_cols($newvec2(1.0, 2.0), $newvec2(3.0, 4.0));
+            const M1: $mat2 = $mat2::from_cols_array(&MATRIX1D);
+            const M2: $mat2 = $mat2::from_cols_array_2d(&MATRIX);
+
+            assert_eq!(MATRIX1D, M0.to_cols_array());
+            assert_eq!(MATRIX1D, M1.to_cols_array());
+            assert_eq!(MATRIX1D, M2.to_cols_array());
         });
 
         glam_test!(test_mat2_identity, {
@@ -23,6 +26,7 @@ macro_rules! impl_mat2_tests {
             assert_eq!($mat2::from_cols_array_2d(&IDENTITY), identity);
             assert_eq!(identity, identity * identity);
             assert_eq!(identity, $mat2::default());
+            assert_eq!(identity, $mat2::from_diagonal($vec2::ONE));
         });
 
         glam_test!(test_mat2_zero, {
@@ -186,7 +190,6 @@ macro_rules! impl_mat2_tests {
         });
 
         glam_test!(test_mat2_to_from_slice, {
-            const MATRIX1D: [$t; 4] = [1.0, 2.0, 3.0, 4.0];
             let m = $mat2::from_cols_slice(&MATRIX1D);
             assert_eq!($mat2::from_cols_array(&MATRIX1D), m);
             let mut out: [$t; 4] = Default::default();
@@ -200,11 +203,13 @@ macro_rules! impl_mat2_tests {
         glam_test!(test_sum, {
             let id = $mat2::IDENTITY;
             assert_eq!(vec![id, id].iter().sum::<$mat2>(), id + id);
+            assert_eq!(vec![id, id].into_iter().sum::<$mat2>(), id + id);
         });
 
         glam_test!(test_product, {
             let two = $mat2::IDENTITY + $mat2::IDENTITY;
             assert_eq!(vec![two, two].iter().product::<$mat2>(), two * two);
+            assert_eq!(vec![two, two].into_iter().product::<$mat2>(), two * two);
         });
 
         glam_test!(test_mat2_is_finite, {
@@ -219,9 +224,23 @@ macro_rules! impl_mat2_tests {
     };
 }
 
+macro_rules! impl_as_ref_tests {
+    ($mat:ident) => {
+        glam_test!(test_as_ref, {
+            let m = $mat::from_cols_array_2d(&MATRIX);
+            assert_eq!(MATRIX1D, *m.as_ref());
+        });
+        glam_test!(test_as_mut, {
+            let mut m = $mat::ZERO;
+            *m.as_mut() = MATRIX1D;
+            assert_eq!($mat::from_cols_array_2d(&MATRIX), m);
+        });
+    };
+}
+
 mod mat2 {
     use super::support::deg;
-    use glam::{const_mat2, mat2, swizzles::*, vec2, Mat2, Mat3, Vec2};
+    use glam::{mat2, swizzles::*, vec2, Mat2, Mat3, Vec2};
 
     glam_test!(test_align, {
         use std::mem;
@@ -231,6 +250,13 @@ mod mat2 {
         } else {
             assert_eq!(16, mem::align_of::<Mat2>());
         }
+    });
+
+    glam_test!(test_from_mat3a, {
+        use glam::Mat3A;
+        let m3 = Mat3A::from_cols_array_2d(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+        let m2 = Mat2::from_mat3a(m3);
+        assert_eq!(Mat2::from_cols_array_2d(&[[1.0, 2.0], [4.0, 5.0]]), m2);
     });
 
     glam_test!(test_as, {
@@ -245,12 +271,13 @@ mod mat2 {
         );
     });
 
-    impl_mat2_tests!(f32, const_mat2, mat2, Mat2, Mat3, vec2, Vec2);
+    impl_mat2_tests!(f32, mat2, Mat2, Mat3, vec2, Vec2);
+    impl_as_ref_tests!(Mat2);
 }
 
 mod dmat2 {
     use super::support::deg;
-    use glam::{const_dmat2, dmat2, dvec2, swizzles::*, DMat2, DMat3, DVec2};
+    use glam::{dmat2, dvec2, swizzles::*, DMat2, DMat3, DVec2};
 
     glam_test!(test_align, {
         use std::mem;
@@ -258,5 +285,6 @@ mod dmat2 {
         assert_eq!(mem::align_of::<DVec2>(), mem::align_of::<DMat2>());
     });
 
-    impl_mat2_tests!(f64, const_dmat2, dmat2, DMat2, DMat3, dvec2, DVec2);
+    impl_mat2_tests!(f64, dmat2, DMat2, DMat3, dvec2, DVec2);
+    impl_as_ref_tests!(DMat2);
 }
