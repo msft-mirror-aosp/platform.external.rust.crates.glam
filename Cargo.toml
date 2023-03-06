@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.58.1"
 name = "glam"
-version = "0.22.0"
+version = "0.23.0"
 authors = ["Cameron Hart <cameron.hart@gmail.com>"]
 description = "A simple and fast 3D math library for games and graphics"
 readme = "README.md"
@@ -136,7 +136,7 @@ scalar-math = []
 std = []
 
 [target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.criterion]
-version = "0.3"
+version = "0.4"
 features = ["html_reports"]
 
 [target."cfg(target_arch = \"wasm32\")".dev-dependencies.wasm-bindgen-test]
