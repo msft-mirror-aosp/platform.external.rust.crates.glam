@@ -50,6 +50,4 @@ rust_library_host {
         "default",
         "std",
     ],
-    product_available: true,
-    vendor_available: true,
 }
